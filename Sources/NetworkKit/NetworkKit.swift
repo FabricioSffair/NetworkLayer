@@ -16,12 +16,21 @@ public protocol NetworkServicable {
     var networkRequester: NetworkRequestable { get }
 }
 
-public struct NetworkRequest {
-    let url: String
-    let headers: [String: String]?
-    let body: Encodable?
-    let timeout: Float?
-    let httpMethod: HTTPMethod
+public protocol NetworkRequestRepresentable {
+    var timeout: Float? { get }
+    var url: String { get }
+    var headers: [String: String]? { get }
+    var httpMethod: HTTPMethod { get }
+    var body: Encodable? { get }
+    func buildURLRequest(with url: URL) -> URLRequest
+}
+
+public struct NetworkRequest: NetworkRequestRepresentable {
+    public let url: String
+    public let headers: [String: String]?
+    public let body: Encodable?
+    public let timeout: Float?
+    public let httpMethod: HTTPMethod
     
     public init(url: String,
                 headers: [String: String]?,

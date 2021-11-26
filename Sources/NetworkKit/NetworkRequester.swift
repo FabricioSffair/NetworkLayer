@@ -9,7 +9,7 @@ import Foundation
 
 public protocol NetworkRequestable {
     var requestTimeOut: Int { get }
-    func request<T: Decodable>(_ req: NetworkRequest, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void)
+    func request<T: Decodable>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void)
 }
 
 public class NetworkRequester: NetworkRequestable {
@@ -18,7 +18,7 @@ public class NetworkRequester: NetworkRequestable {
 
     public init() {}
     
-    public func request<T>(_ req: NetworkRequest, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void) where T: Decodable {
+    public func request<T>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void) where T: Decodable {
         if let timeout = req.timeout {
             let sessionConfig = URLSessionConfiguration.default
             sessionConfig.timeoutIntervalForRequest = TimeInterval(timeout)
