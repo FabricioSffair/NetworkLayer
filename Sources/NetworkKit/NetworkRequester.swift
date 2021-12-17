@@ -1,15 +1,11 @@
-//
-//  Request.swift
-//  BiometryksTest
-//
-//  Created by Fabrício Sperotto Sffair on 2021-10-08.
-//
-
 import Foundation
+import Combine
 
 public protocol NetworkRequestable {
     var requestTimeOut: Int { get }
     func request<T: Decodable>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void)
+    @available(macOS 10.15, *)
+    func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, NetworkRequestError> where T: Decodable
 }
 
 public class NetworkRequester: NetworkRequestable {
@@ -43,6 +39,35 @@ public class NetworkRequester: NetworkRequestable {
             }
         })
         task.resume()
+    }
+    
+    @available(macOS 10.15, *)
+    public func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, NetworkRequestError> where T: Decodable {
+        func emptyPublisher(completeImmediately: Bool = true) -> AnyPublisher<T, NetworkRequestError> {
+           Empty<T, NetworkRequestError>(completeImmediately: completeImmediately).eraseToAnyPublisher()
+        }
+
+        if let timeout = req.timeout {
+            let sessionConfig = URLSessionConfiguration.default
+            sessionConfig.timeoutIntervalForRequest = TimeInterval(timeout)
+        } else {
+            let sessionConfig = URLSessionConfiguration.default
+            sessionConfig.timeoutIntervalForRequest = TimeInterval(requestTimeOut)
+        }
+        
+        guard let url = URL(string: req.url) else {
+            return emptyPublisher()
+        }
+        
+        return URLSession().dataTaskPublisher(for: req.buildURLRequest(with: url))
+            .map { $0.data }
+            .decode(type: T.self, decoder: JSONDecoder())
+            .catch({ error -> AnyPublisher<T,NetworkRequestError> in
+                return emptyPublisher()
+            })
+            .receive(on: RunLoop.main)
+            .eraseToAnyPublisher()
+        
     }
 }
 
