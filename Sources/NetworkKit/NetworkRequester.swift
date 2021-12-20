@@ -67,7 +67,6 @@ public class NetworkRequester: NetworkRequestable {
             .catch({ error -> AnyPublisher<T,NetworkRequestError> in
                 return emptyPublisher()
             })
-            .receive(on: RunLoop.main)
             .eraseToAnyPublisher()
         
     }
