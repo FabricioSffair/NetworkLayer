@@ -1,13 +1,16 @@
 import Foundation
 import Combine
 
+@available(iOS 13.0, *)
+@available(macOS 10.15, *)
 public protocol NetworkRequestable {
     var requestTimeOut: Int { get }
     func request<T: Decodable>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void)
-    @available(macOS 10.15, *)
     func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, NetworkRequestError> where T: Decodable
 }
 
+@available(iOS 13.0, *)
+@available(macOS 10.15, *)
 public class NetworkRequester: NetworkRequestable {
     
     public var requestTimeOut: Int = 30
@@ -41,7 +44,6 @@ public class NetworkRequester: NetworkRequestable {
         task.resume()
     }
     
-    @available(macOS 10.15, *)
     public func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, NetworkRequestError> where T: Decodable {
         func emptyPublisher(completeImmediately: Bool = true) -> AnyPublisher<T, NetworkRequestError> {
            Empty<T, NetworkRequestError>(completeImmediately: completeImmediately).eraseToAnyPublisher()
