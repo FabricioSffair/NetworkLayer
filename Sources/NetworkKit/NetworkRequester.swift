@@ -6,7 +6,7 @@ import Combine
 public protocol NetworkRequestable {
     var requestTimeOut: Int { get }
     func request<T: Decodable>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void)
-    func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, NetworkRequestError> where T: Decodable
+    func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, URLError> where T: Decodable
 }
 
 @available(iOS 13.0, *)
@@ -44,9 +44,9 @@ public class NetworkRequester: NetworkRequestable {
         task.resume()
     }
     
-    public func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, NetworkRequestError> where T: Decodable {
-        func emptyPublisher(completeImmediately: Bool = true) -> AnyPublisher<T, NetworkRequestError> {
-           Empty<T, NetworkRequestError>(completeImmediately: completeImmediately).eraseToAnyPublisher()
+    public func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, URLError> where T: Decodable {
+        func emptyPublisher(completeImmediately: Bool = true) -> AnyPublisher<T, URLError> {
+           Empty<T, URLError>(completeImmediately: true).eraseToAnyPublisher()
         }
 
         if let timeout = req.timeout {
@@ -61,15 +61,47 @@ public class NetworkRequester: NetworkRequestable {
             return emptyPublisher()
         }
         
-        return URLSession().dataTaskPublisher(for: req.buildURLRequest(with: url))
-            .map { $0.data }
+        return URLSession.shared
+            .dataTaskPublisher(for: req.buildURLRequest(with: url))
+            .tryMap {
+                guard let httpResponse = $0.response as? HTTPURLResponse else {
+                    throw URLError(.badServerResponse)
+                }
+                switch httpResponse.statusCode {
+                case 401:
+                    throw URLError(.userAuthenticationRequired)
+                case 400,402...499:
+                    throw URLError(.dataNotAllowed)
+                case 500...599:
+                    throw URLError(.badServerResponse)
+                default:
+                    break
+                }
+                return $0.data
+            }
             .decode(type: T.self, decoder: JSONDecoder())
-            .catch({ error -> AnyPublisher<T,NetworkRequestError> in
-                return emptyPublisher()
+            .mapError({ _ in
+                URLError(.cannotParseResponse)
             })
             .eraseToAnyPublisher()
         
     }
+}
+
+
+@available(macOS 10.15, *)
+@available(iOS 13.0, *)
+extension Publisher {
+  func tryDecodeResponse<Item, Coder>(type: Item.Type, decoder: Coder) -> Publishers.Decode<Publishers.TryMap<Self, Data>, Item, Coder> where Item: Decodable, Coder: TopLevelDecoder, Self.Output == (data: Data, response: URLResponse) {
+    return self
+      .tryMap { output in
+        guard let httpResponse = output.response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NetworkRequestError.serverError("Bad Server Response")
+        }
+        return output.data
+      }
+      .decode(type: type, decoder: decoder)
+  }
 }
 
 
