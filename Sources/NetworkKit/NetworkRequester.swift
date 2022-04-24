@@ -1,21 +1,52 @@
 import Foundation
 import Combine
 
-@available(iOS 13.0, *)
-@available(macOS 10.15, *)
+@available(iOS 15.0, *)
+@available(macOS 12.0, *)
 public protocol NetworkRequestable {
     var requestTimeOut: Int { get }
     func request<T: Decodable>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void)
     func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, URLError> where T: Decodable
+    func request<T: Decodable>(_ req: NetworkRequestRepresentable) async -> Result<T, NetworkRequestError>
 }
 
-@available(iOS 13.0, *)
-@available(macOS 10.15, *)
+@available(iOS 15.0, *)
+@available(macOS 12.0, *)
+
 public class NetworkRequester: NetworkRequestable {
     
     public var requestTimeOut: Int = 30
 
     public init() {}
+    
+    public func request<T: Decodable>(_ req: NetworkRequestRepresentable) async -> Result<T, NetworkRequestError> {
+        if let timeout = req.timeout {
+            let sessionConfig = URLSessionConfiguration.default
+            sessionConfig.timeoutIntervalForRequest = TimeInterval(timeout)
+        } else {
+            let sessionConfig = URLSessionConfiguration.default
+            sessionConfig.timeoutIntervalForRequest = TimeInterval(requestTimeOut)
+        }
+        
+        guard let url = URL(string: req.url) else {
+            return .failure(NetworkRequestError.badURL("Invalid URL"))
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            if let error = (response as? HTTPURLResponse)?.getResponseError(with: data.toJSONString()) {
+                return .failure(error)
+            }
+            
+            guard let response = try? JSONDecoder().decode(T.self, from: data) else {
+                return .failure(.unableToParseData("Unable to decode data received"))
+            }
+            return .success(response)
+        } catch {
+            return .failure(.unknown("Session failed."))
+        }
+    }
     
     public func request<T>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void) where T: Decodable {
         if let timeout = req.timeout {
@@ -89,8 +120,8 @@ public class NetworkRequester: NetworkRequestable {
 }
 
 
-@available(macOS 10.15, *)
-@available(iOS 13.0, *)
+@available(macOS 12.0, *)
+@available(iOS 15.0, *)
 extension Publisher {
   func tryDecodeResponse<Item, Coder>(type: Item.Type, decoder: Coder) -> Publishers.Decode<Publishers.TryMap<Self, Data>, Item, Coder> where Item: Decodable, Coder: TopLevelDecoder, Self.Output == (data: Data, response: URLResponse) {
     return self
