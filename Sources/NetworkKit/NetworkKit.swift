@@ -12,7 +12,7 @@ public enum HTTPMethod: String {
 }
 
 
-@available(macOS 10.15, *)
+@available(macOS 12.0, *)
 @available(iOS 13.0, *)
 public protocol NetworkServicable {
     var networkRequester: NetworkRequestable { get }
