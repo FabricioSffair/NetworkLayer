@@ -7,7 +7,7 @@ public protocol NetworkRequestable {
     var requestTimeOut: Int { get }
     func request<T: Decodable>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void)
     func request<T>(_ req: NetworkRequestRepresentable) -> AnyPublisher<T, URLError> where T: Decodable
-    func request<T: Decodable>(_ req: NetworkRequestRepresentable) async throws -> Result<T, NetworkRequestError>
+    func request<T: Decodable>(_ req: NetworkRequestRepresentable) async -> Result<T, NetworkRequestError>
 }
 
 @available(iOS 13.0, *)
@@ -19,7 +19,7 @@ public class NetworkRequester: NetworkRequestable {
 
     public init() {}
     
-    public func request<T: Decodable>(_ req: NetworkRequestRepresentable) async throws -> Result<T, NetworkRequestError> {
+    public func request<T: Decodable>(_ req: NetworkRequestRepresentable) async -> Result<T, NetworkRequestError> {
         if let timeout = req.timeout {
             let sessionConfig = URLSessionConfiguration.default
             sessionConfig.timeoutIntervalForRequest = TimeInterval(timeout)
@@ -32,16 +32,20 @@ public class NetworkRequester: NetworkRequestable {
             return .failure(NetworkRequestError.badURL("Invalid URL"))
         }
         
-        let (data, response) = try await URLSession.shared.data(from: url)
-        
-        if let error = (response as? HTTPURLResponse)?.getResponseError(with: data.toJSONString()) {
-            return .failure(error)
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            if let error = (response as? HTTPURLResponse)?.getResponseError(with: data.toJSONString()) {
+                return .failure(error)
+            }
+            
+            guard let response = try? JSONDecoder().decode(T.self, from: data) else {
+                return .failure(.unableToParseData("Unable to decode data received"))
+            }
+            return .success(response)
+        } catch {
+            return .failure(.unknown("Session failed."))
         }
-        
-        guard let response = try? JSONDecoder().decode(T.self, from: data) else {
-            return .failure(.unableToParseData("Unable to decode data received"))
-        }
-        return .success(response)
     }
     
     public func request<T>(_ req: NetworkRequestRepresentable, onComplete: @escaping (Result<T, NetworkRequestError>) -> Void) where T: Decodable {
