@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-@available(iOS 13.0, *)
+@available(iOS 15.0, *)
 @available(macOS 12.0, *)
 public protocol NetworkRequestable {
     var requestTimeOut: Int { get }
@@ -10,7 +10,7 @@ public protocol NetworkRequestable {
     func request<T: Decodable>(_ req: NetworkRequestRepresentable) async -> Result<T, NetworkRequestError>
 }
 
-@available(iOS 13.0, *)
+@available(iOS 15.0, *)
 @available(macOS 12.0, *)
 
 public class NetworkRequester: NetworkRequestable {
@@ -121,7 +121,7 @@ public class NetworkRequester: NetworkRequestable {
 
 
 @available(macOS 12.0, *)
-@available(iOS 13.0, *)
+@available(iOS 15.0, *)
 extension Publisher {
   func tryDecodeResponse<Item, Coder>(type: Item.Type, decoder: Coder) -> Publishers.Decode<Publishers.TryMap<Self, Data>, Item, Coder> where Item: Decodable, Coder: TopLevelDecoder, Self.Output == (data: Data, response: URLResponse) {
     return self
